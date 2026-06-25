@@ -103,9 +103,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Log in to GHCR (so runner can pull private image)
+        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u vip1095 --password-stdin
+
+      - name: Ensure minikube is running
+        run: minikube status || minikube start
+
       - name: Pull latest image into minikube
         run: |
-          # Load the image into minikube's internal Docker daemon
           docker pull ${{ env.IMAGE_NAME }}:latest
           minikube image load ${{ env.IMAGE_NAME }}:latest
 
