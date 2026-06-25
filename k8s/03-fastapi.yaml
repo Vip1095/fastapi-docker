@@ -1,0 +1,79 @@
+---
+# ConfigMap holds non-sensitive env vars (replaces docker-compose "environment")
+# DB_HOST points to the postgres K8s Service name, not the docker container name
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fastapi-config
+  namespace: fastapi-app
+data:
+  APP_ENV: "production"
+  DB_HOST: "postgres-svc"   # K8s resolves this to the postgres Service IP
+  DB_NAME: "mydb"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi
+  namespace: fastapi-app
+spec:
+  replicas: 2   # scale horizontally — docker-compose had 1
+  selector:
+    matchLabels:
+      app: fastapi
+  template:
+    metadata:
+      labels:
+        app: fastapi
+    spec:
+      containers:
+        - name: fastapi
+          # Build and push your image first:
+          #   docker build -t <your-registry>/fastapi-app:latest .
+          #   docker push <your-registry>/fastapi-app:latest
+          # For local minikube: minikube image load fastapi-app:latest
+          image: fastapi-app:latest
+          imagePullPolicy: IfNotPresent  # use local image if available (good for minikube)
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: fastapi-config
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: DB_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+
+---
+# ClusterIP — internal only, Nginx talks to this service
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi-svc
+  namespace: fastapi-app
+spec:
+  selector:
+    app: fastapi
+  ports:
+    - port: 8000
+      targetPort: 8000

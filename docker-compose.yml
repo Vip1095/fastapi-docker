@@ -1,0 +1,59 @@
+services:
+
+  # ── Service 1: Nginx (reverse proxy — the only public-facing service) ──
+  nginx:
+    image: nginx:alpine                      # official Nginx image, alpine = small
+    container_name: nginx_proxy
+    ports:
+      - "8090:80"                            # only Nginx is exposed to your machine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro   # mount our config (ro = read-only)
+    depends_on:
+      - api                                  # start after api is up
+    networks:
+      - app_network
+
+  # ── Service 2: FastAPI application ─────────────────────────────────────
+  api:
+    build: .
+    container_name: fastapi_app
+    # NO ports exposed here — only Nginx can reach it, not your machine directly
+    expose:
+      - "8000"                               # expose to other containers only
+    environment:
+      - APP_ENV=development
+      - DB_HOST=db
+      - DB_NAME=mydb
+      - DB_USER=admin
+      - DB_PASSWORD=secret
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  # ── Service 3: PostgreSQL database ─────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    # NO ports exposed — only the api container can reach it
+    environment:
+      - POSTGRES_DB=mydb
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d mydb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+
+networks:
+  app_network:
+    driver: bridge
