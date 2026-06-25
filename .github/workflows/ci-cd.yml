@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/fastapi-docker
@@ -40,13 +40,13 @@ jobs:
 
   # ────────────────────────────────────────────────
   # JOB 2: Build and push Docker image to GHCR
-  # Only runs on push to main (not on PRs)
+  # Only runs on push to master (not on PRs)
   # ────────────────────────────────────────────────
   build-push:
     name: Build & Push Image
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
 
     permissions:
       contents: read
@@ -94,7 +94,7 @@ jobs:
     name: Deploy to Minikube
     runs-on: self-hosted        # your machine must have a runner registered
     needs: build-push
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
 
     steps:
       - name: Checkout code
